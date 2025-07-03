@@ -27,6 +27,7 @@ class MediaStreamingServer:
         app["server"] = self
 
         # Add endpoints
+        app.router.add_get('/health', self.health_check)
         app.router.add_post('/enqueue-video', self.enqueue_video)
         app.router.add_post('/webrtc/offer', self.webrtc_offer)
         app.router.add_post('/webrtc/answer', self.webrtc_answer)
@@ -51,6 +52,10 @@ class MediaStreamingServer:
 
 
         return app
+    
+    async def health_check(self, request):
+        return web.json_response({"status": "ok", "message": "Server is healthy."})
+
 
     async def enqueue_video(self, request):
         data = await request.json()

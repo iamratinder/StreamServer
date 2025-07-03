@@ -33,14 +33,22 @@ class MediaStreamingServer:
 
         # Add CORS
         cors = aiohttp_cors.setup(app, defaults={
+            "http://localhost:3000": aiohttp_cors.ResourceOptions(
+                allow_credentials=True,
+                expose_headers="*",
+                allow_headers="*"
+            ),
             "*": aiohttp_cors.ResourceOptions(
                 allow_credentials=True,
                 expose_headers="*",
                 allow_headers="*"
             )
         })
-        for route in app.router.routes():
+
+        # Attach CORS to all routes
+        for route in list(app.router.routes()):
             cors.add(route)
+
 
         return app
 

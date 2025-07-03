@@ -19,7 +19,7 @@ class MediaStreamingServer:
         self.port = port
         self.media_dir = Path(media_dir)
         self.media_dir.mkdir(parents=True, exist_ok=True)
-        self.latest_video_path: Optional[Path] = None
+        self.latest_video_url: Optional[str] = None
         self.webpcs: List[RTCPeerConnection] = []
 
     async def create_http_server(self):
@@ -64,24 +64,10 @@ class MediaStreamingServer:
         if not url:
             return web.json_response({"error": "Missing 'url'"}, status=400)
 
-        filename = os.path.basename(url)
-        save_path = self.media_dir / filename
+        self.latest_video_url = url
+        logger.info(f"✅ Video URL enqueued: {url}")
+        return web.json_response({"message": "Video URL enqueued successfully"})
 
-        try:
-            async with aiohttp.ClientSession() as session:
-                async with session.get(url) as resp:
-                    if resp.status != 200:
-                        return web.json_response({"error": "Failed to download file"}, status=400)
-                    with open(save_path, "wb") as f:
-                        f.write(await resp.read())
-
-            self.latest_video_path = save_path
-            logger.info(f"✅ Video enqueued: {save_path}")
-            return web.json_response({"message": "Video enqueued successfully"})
-
-        except Exception as e:
-            logger.error(f"❌ Exception during enqueue: {e}")
-            return web.json_response({"error": "Internal server error"}, status=500)
 
     async def webrtc_offer(self, request):
         params = await request.json()
@@ -89,10 +75,14 @@ class MediaStreamingServer:
         pc = RTCPeerConnection()
         self.webpcs.append(pc)
 
-        if not self.latest_video_path or not self.latest_video_path.exists():
-            return web.json_response({"error": "No video enqueued yet"}, status=404)
+        if not self.latest_video_url:
+            return web.json_response({"error": "No video URL enqueued yet"}, status=404)
 
-        player = MediaPlayer(str(self.latest_video_path))
+        try:
+            player = MediaPlayer(self.latest_video_url, format='mp4')  # or auto-detect
+        except Exception as e:
+            logger.error(f"❌ Failed to create MediaPlayer from URL: {e}")
+            return web.json_response({"error": "Invalid media URL or ffmpeg issue"}, status=500)
 
         if player.video:
             logger.info("✅ Adding video track")
